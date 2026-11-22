@@ -1,9 +1,13 @@
-name: Build Android APK
+name: Build & Release Android APK
 
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -26,8 +30,31 @@ jobs:
       - name: Build Debug APK
         run: gradle assembleDebug
 
-      - name: Upload APK
+      - name: Rename APK for Release
+        run: cp app/build/outputs/apk/debug/app-debug.apk BIM-KML-Generator.apk
+
+      - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BIM-KML-Generator-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: BIM-KML-Generator.apk
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: BIM-KML-Generator.apk
+          name: "BIM KML & Tracker Generator ${{ github.ref_name }}"
+          body: |
+            ## BIM KML & Tracker Generator (${{ github.ref_name }})
+
+            ### What's Included
+            - **Excel & CSV Import:** Load `.xlsx`, `.xls`, and `.csv` coordinate sheets directly on Android.
+            - **Auto Coordinate Detection:** Automatically detects Latitude and Longitude columns.
+            - **Custom KML Placemarks:** Choose multiple columns for placemark `<name>` and `<description>` fields.
+            - **Searchable Multi-Value Filters:** Filter rows by any column and optionally split exports into separate files per filter combination.
+            - **Direct Downloads:** Saves `.kml` (Google Earth) and `.xlsx` (Excel Tracker) files straight to your phone's `Downloads` folder.
+
+            ### Installation
+            1. Download **BIM-KML-Generator.apk** below.
+            2. Open it on your Android device and allow **Install unknown apps** if prompted.
