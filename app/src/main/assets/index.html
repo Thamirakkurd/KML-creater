@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BIM KML &amp; Tracker Generator</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f4f6f9; }
+    .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+    .scroll-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+  </style>
+</head>
+<body class="min-h-screen text-slate-800 pb-12">
+
+  <!-- Header -->
+  <header class="bg-[#1f4e79] text-white shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg sm:text-xl font-bold tracking-tight">BIM KML &amp; Tracker Generator</h1>
+          <p class="text-xs text-blue-100">Convert Excel / CSV coordinates into Google Earth KML &amp; filtered Excel trackers</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="statusBadge" class="text-xs bg-white/15 text-white px-3 py-1.5 rounded-full font-medium">No file loaded</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-6xl mx-auto px-4 mt-5 space-y-5">
+
+    <!-- File Upload Bar -->
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <label for="fileInput" class="cursor-pointer inline-flex items-center gap-2 bg-[#1f4e79] hover:bg-[#173c5e] text-white font-semibold text-sm px-4 py-2.5 rounded-lg transition shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          Load Excel / CSV File
+        </label>
+        <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+        <button id="loadSampleBtn" type="button" class="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-sm px-3.5 py-2.5 rounded-lg transition">
+          Load Sample Data
+        </button>
+      </div>
+      <div id="fileInfoText" class="text-xs text-slate-500">Supports .xlsx, .xls, and .csv files — processed 100% locally on your device.</div>
+    </section>
+
+    <!-- 3-Column Configuration Grid -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+      <!-- KML Name Columns -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-sm font-bold text-slate-800">KML Name Columns</h2>
+          <span id="nameCount" class="text-xs text-slate-500 font-medium">0 selected</span>
+        </div>
+        <p class="text-xs text-slate-500 mb-2">Joined with &ldquo; - &rdquo; for each placemark title.</p>
+        <div id="nameColList" class="flex-1 max-h-56 overflow-y-auto scroll-thin border border-slate-200 rounded-lg p-2 space-y-1 bg-slate-50">
+          <p class="text-xs text-slate-400 text-center py-8">Load a file to view columns</p>
+        </div>
+      </div>
+
+      <!-- KML Description Columns -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-sm font-bold text-slate-800">KML Description Columns</h2>
+          <span id="descCount" class="text-xs text-slate-500 font-medium">0 selected</span>
+        </div>
+        <p class="text-xs text-slate-500 mb-2">Joined with &ldquo; - &rdquo; inside placemark details.</p>
+        <div id="descColList" class="flex-1 max-h-56 overflow-y-auto scroll-thin border border-slate-200 rounded-lg p-2 space-y-1 bg-slate-50">
+          <p class="text-xs text-slate-400 text-center py-8">Load a file to view columns</p>
+        </div>
+      </div>
+
+      <!-- Coordinates & Output Options -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between space-y-4">
+        <div class="space-y-3">
+          <h2 class="text-sm font-bold text-slate-800">Coordinates &amp; Output</h2>
+          <div>
+            <label for="latSelect" class="block text-xs font-semibold text-slate-600 mb-1">Latitude Column</label>
+            <select id="latSelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1f4e79]">
+              <option value="">-- Select Latitude --</option>
+            </select>
+          </div>
+          <div>
+            <label for="lonSelect" class="block text-xs font-semibold text-slate-600 mb-1">Longitude Column</label>
+            <select id="lonSelect" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1f4e79]">
+              <option value="">-- Select Longitude --</option>
+            </select>
+          </div>
+        </div>
+        <div class="pt-2 border-t border-slate-100">
+          <label class="flex items-center gap-2.5 cursor-pointer select-none">
+            <input id="globalSeparateChk" type="checkbox" class="w-4 h-4 rounded text-[#1f4e79] focus:ring-[#1f4e79]" />
+            <span class="text-xs font-medium text-slate-700">Create Files Separately (Global)</span>
+          </label>
+          <p class="text-[11px] text-slate-400 mt-1">Exports one file per active filter-value combination.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dynamic Filters -->
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div>
+          <h2 class="text-sm font-bold text-slate-800">Filters</h2>
+          <p class="text-xs text-slate-500">Filter rows by column values or split exports per value.</p>
+        </div>
+        <button id="addFilterBtn" type="button" class="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs px-3.5 py-2 rounded-lg transition">
+          + Add Filter
+        </button>
+      </div>
+      <div id="filterRowsContainer" class="space-y-2">
+        <p id="noFiltersMsg" class="text-xs text-slate-400 py-2">No filters added. All rows will be included.</p>
+      </div>
+    </section>
+
+    <!-- Export Actions -->
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-3">
+      <div class="text-sm text-slate-600">
+        Matching rows: <span id="filteredRowCount" class="font-bold text-slate-900">0</span>
+        <span id="totalRowCount" class="text-xs text-slate-400"></span>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <button id="createKmlBtn" type="button" class="inline-flex items-center gap-2 bg-[#1f4e79] hover:bg-[#173c5e] text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition shadow-sm">
+          Create KML
+        </button>
+        <button id="createTrackerBtn" type="button" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition shadow-sm">
+          Create Tracker (.xlsx)
+        </button>
+      </div>
+    </section>
+
+    <!-- Data Preview -->
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-bold text-slate-800">Filtered Data Preview</h2>
+        <span class="text-xs text-slate-400">Showing up to 25 rows</span>
+      </div>
+      <div id="previewWrapper" class="overflow-x-auto scroll-thin border border-slate-200 rounded-lg">
+        <p class="text-xs text-slate-400 text-center py-8">Load a file or click &ldquo;Load Sample Data&rdquo; to preview rows.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Filter Values Modal -->
+  <div id="filterModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[85vh]">
+      <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+        <h3 id="modalTitle" class="text-sm font-bold text-slate-800">Filter Values</h3>
+        <button id="closeModalBtn" type="button" class="text-slate-400 hover:text-slate-700 text-lg leading-none px-1">&times;</button>
+      </div>
+      <div class="p-3 border-b border-slate-100">
+        <input id="modalSearchInput" type="text" placeholder="Search values..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1f4e79]" />
+      </div>
+      <div id="modalValuesList" class="flex-1 overflow-y-auto scroll-thin p-3 space-y-1.5"></div>
+      <div class="p-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 bg-slate-50 rounded-b-xl">
+        <div class="flex items-center gap-2">
+          <button id="modalSelectAllBtn" type="button" class="text-xs font-semibold text-[#1f4e79] hover:underline px-2 py-1">Select All</button>
+          <button id="modalClearAllBtn" type="button" class="text-xs font-semibold text-slate-600 hover:underline px-2 py-1">Clear Filter</button>
+        </div>
+        <button id="modalApplyBtn" type="button" class="bg-[#1f4e79] hover:bg-[#173c5e] text-white text-xs font-semibold px-4 py-2 rounded-lg transition">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm"></div>
+
+  <script>
+    (function () {
+      const state = {
+        fileName: '',
+        rows: [],
+        columns: [],
+        nameCols: new Set(),
+        descCols: new Set(),
+        latCol: '',
+        lonCol: '',
+        filters: [],
+        nextFilterId: 1,
+        activeModalFilterId: null,
+        modalTempSelected: new Set(),
+        modalAllValues: []
+      };
+
+      const el = {
+        fileInput: document.getElementById('fileInput'),
+        loadSampleBtn: document.getElementById('loadSampleBtn'),
+        statusBadge: document.getElementById('statusBadge'),
+        fileInfoText: document.getElementById('fileInfoText'),
+        nameColList: document.getElementById('nameColList'),
+        descColList: document.getElementById('descColList'),
+        nameCount: document.getElementById('nameCount'),
+        descCount: document.getElementById('descCount'),
+        latSelect: document.getElementById('latSelect'),
+        lonSelect: document.getElementById('lonSelect'),
+        globalSeparateChk: document.getElementById('globalSeparateChk'),
+        addFilterBtn: document.getElementById('addFilterBtn'),
+        filterRowsContainer: document.getElementById('filterRowsContainer'),
+        noFiltersMsg: document.getElementById('noFiltersMsg'),
+        filteredRowCount: document.getElementById('filteredRowCount'),
+        totalRowCount: document.getElementById('totalRowCount'),
+        createKmlBtn: document.getElementById('createKmlBtn'),
+        createTrackerBtn: document.getElementById('createTrackerBtn'),
+        previewWrapper: document.getElementById('previewWrapper'),
+        filterModal: document.getElementById('filterModal'),
+        modalTitle: document.getElementById('modalTitle'),
+        closeModalBtn: document.getElementById('closeModalBtn'),
+        modalSearchInput: document.getElementById('modalSearchInput'),
+        modalValuesList: document.getElementById('modalValuesList'),
+        modalSelectAllBtn: document.getElementById('modalSelectAllBtn'),
+        modalClearAllBtn: document.getElementById('modalClearAllBtn'),
+        modalApplyBtn: document.getElementById('modalApplyBtn'),
+        toastContainer: document.getElementById('toastContainer')
+      };
+
+      function showToast(message, type = 'info') {
+        const colors = {
+          info: 'bg-slate-800 text-white',
+          success: 'bg-emerald-600 text-white',
+          warning: 'bg-amber-600 text-white',
+          error: 'bg-rose-600 text-white'
+        };
+        const toast = document.createElement('div');
+        toast.className = `${colors[type] || colors.info} text-xs sm:text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg transition-opacity duration-300`;
+        toast.textContent = message;
+        el.toastContainer.appendChild(toast);
+        setTimeout(() => {
+          toast.classList.add('opacity-0');
+          setTimeout(() => toast.remove(), 300);
+        }, 3200);
+      }
+
+      function escapeXml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&apos;');
+      }
+
+      function sanitizeFilename(name) {
+        return String(name).replace(/[\\/:*?"<>|]/g, '_').trim() || 'export';
+      }
+
+      function isNotEmpty(val) {
+        return val !== null && val !== undefined && String(val).trim() !== '' && String(val).trim().toLowerCase() !== 'nan';
+      }
+
+      function loadDataset(rows, fileName) {
+        if (!rows || rows.length === 0) {
+          showToast('The selected file has no data rows.', 'warning');
+          return;
+        }
+        const colSet = new Set();
+        rows.forEach(r => Object.keys(r).forEach(k => colSet.add(k)));
+        state.columns = Array.from(colSet);
+        state.rows = rows;
+        state.fileName = fileName;
+        state.nameCols.clear();
+        state.descCols.clear();
+        state.filters = [];
+
+        const latCandidates = state.columns.filter(c => {
+          const lc = c.toLowerCase();
+          return lc.includes('latitude') || lc === 'lat' || lc.includes('lat_');
+        });
+        const lonCandidates = state.columns.filter(c => {
+          const lc = c.toLowerCase();
+          return lc.includes('longitude') || lc === 'lon' || lc === 'lng' || lc.includes('lon_');
+        });
+        state.latCol = latCandidates[0] || '';
+        state.lonCol = lonCandidates[0] || '';
+
+        if (state.columns.length > 0 && !state.nameCols.size) {
+          state.nameCols.add(state.columns[0]);
+        }
+
+        el.statusBadge.textContent = `${rows.length} rows loaded`;
+        el.fileInfoText.textContent = `Loaded: ${fileName} (${rows.length} rows, ${state.columns.length} columns)`;
+        renderColumnLists();
+        renderCoordSelects();
+        renderFilterRows();
+        updatePreviewAndCounts();
+        showToast(`${rows.length} rows loaded successfully`, 'success');
+      }
+
+      function renderColumnLists() {
+        const buildList = (container, selectedSet, countEl) => {
+          container.innerHTML = '';
+          if (state.columns.length === 0) {
+            container.innerHTML = '<p class="text-xs text-slate-400 text-center py-8">Load a file to view columns</p>';
+            countEl.textContent = '0 selected';
+            return;
+          }
+          state.columns.forEach(col => {
+            const label = document.createElement('label');
+            label.className = 'flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white cursor-pointer text-xs text-slate-700';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = selectedSet.has(col);
+            cb.className = 'w-3.5 h-3.5 rounded text-[#1f4e79] focus:ring-[#1f4e79]';
+            cb.addEventListener('change', () => {
+              if (cb.checked) selectedSet.add(col);
+              else selectedSet.delete(col);
+              countEl.textContent = `${selectedSet.size} selected`;
+            });
+            const span = document.createElement('span');
+            span.className = 'truncate';
+            span.textContent = col;
+            label.appendChild(cb);
+            label.appendChild(span);
+            container.appendChild(label);
+          });
+          countEl.textContent = `${selectedSet.size} selected`;
+        };
+        buildList(el.nameColList, state.nameCols, el.nameCount);
+        buildList(el.descColList, state.descCols, el.descCount);
+      }
+
+      function renderCoordSelects() {
+        const populate = (selectEl, selectedVal, placeholder) => {
+          selectEl.innerHTML = `<option value="">${placeholder}</option>`;
+          state.columns.forEach(col => {
+            const opt = document.createElement('option');
+            opt.value = col;
+            opt.textContent = col;
+            if (col === selectedVal) opt.selected = true;
+            selectEl.appendChild(opt);
+          });
+        };
+        populate(el.latSelect, state.latCol, '-- Select Latitude --');
+        populate(el.lonSelect, state.lonCol, '-- Select Longitude --');
+      }
+
+      function renderFilterRows() {
+        el.filterRowsContainer.innerHTML = '';
+        if (state.filters.length === 0) {
+          el.filterRowsContainer.appendChild(el.noFiltersMsg);
+          el.noFiltersMsg.classList.remove('hidden');
+          return;
+        }
+        state.filters.forEach(f => {
+          const rowDiv = document.createElement('div');
+          rowDiv.className = 'flex flex-wrap items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg p-2.5';
+
+          const colSel = document.createElement('select');
+          colSel.className = 'rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#1f4e79] min-w-[140px]';
+          const emptyOpt = document.createElement('option');
+          emptyOpt.value = '';
+          emptyOpt.textContent = '-- Select Column --';
+          colSel.appendChild(emptyOpt);
+          state.columns.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            if (c === f.column) opt.selected = true;
+            colSel.appendChild(opt);
+          });
+          colSel.addEventListener('change', () => {
+            f.column = colSel.value;
+            f.values = [];
+            renderFilterRows();
+            updatePreviewAndCounts();
+          });
+
+          const sepLabel = document.createElement('label');
+          sepLabel.className = 'flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer px-1';
+          const sepChk = document.createElement('input');
+          sepChk.type = 'checkbox';
+          sepChk.checked = f.separate;
+          sepChk.className = 'w-3.5 h-3.5 rounded text-[#1f4e79]';
+          sepChk.addEventListener('change', () => { f.separate = sepChk.checked; });
+          sepLabel.appendChild(sepChk);
+          sepLabel.appendChild(document.createTextNode('Create Separately'));
+
+          const pickBtn = document.createElement('button');
+          pickBtn.type = 'button';
+          pickBtn.className = 'bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 rounded-lg transition';
+          pickBtn.textContent = `Filter Values (${f.values.length} selected)`;
+          pickBtn.addEventListener('click', () => openFilterModal(f.id));
+
+          const clearBtn = document.createElement('button');
+          clearBtn.type = 'button';
+          clearBtn.className = 'text-xs text-slate-500 hover:text-slate-800 px-2 py-1.5';
+          clearBtn.textContent = 'Clear';
+          clearBtn.addEventListener('click', () => {
+            f.values = [];
+            renderFilterRows();
+            updatePreviewAndCounts();
+          });
+
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.className = 'ml-auto text-xs text-rose-600 hover:text-rose-800 font-medium px-2 py-1.5';
+          removeBtn.textContent = 'Remove';
+          removeBtn.addEventListener('click', () => {
+            state.filters = state.filters.filter(item => item.id !== f.id);
+            renderFilterRows();
+            updatePreviewAndCounts();
+          });
+
+          rowDiv.appendChild(colSel);
+          rowDiv.appendChild(sepLabel);
+          rowDiv.appendChild(pickBtn);
+          rowDiv.appendChild(clearBtn);
+          rowDiv.appendChild(removeBtn);
+          el.filterRowsContainer.appendChild(rowDiv);
+        });
+      }
+
+      function openFilterModal(filterId) {
+        const f = state.filters.find(item => item.id === filterId);
+        if (!f || !f.column) {
+          showToast('Please select a column for this filter first.', 'warning');
+          return;
+        }
+        state.activeModalFilterId = filterId;
+        state.modalTempSelected = new Set(f.values);
+        const uniqueSet = new Set();
+        state.rows.forEach(r => {
+          if (isNotEmpty(r[f.column])) uniqueSet.add(String(r[f.column]));
+        });
+        state.modalAllValues = Array.from(uniqueSet).sort((a, b) => a.localeCompare(b));
+        el.modalTitle.textContent = `Filter: ${f.column}`;
+        el.modalSearchInput.value = '';
+        renderModalValues();
+        el.filterModal.classList.remove('hidden');
+      }
+
+      function renderModalValues() {
+        const q = el.modalSearchInput.value.trim().toLowerCase();
+        el.modalValuesList.innerHTML = '';
+        const visible = state.modalAllValues.filter(v => v.toLowerCase().includes(q));
+        if (visible.length === 0) {
+          el.modalValuesList.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">No matching values</p>';
+          return;
+        }
+        visible.forEach(val => {
+          const label = document.createElement('label');
+          label.className = 'flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-50 cursor-pointer text-xs text-slate-700';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = state.modalTempSelected.has(val);
+          cb.className = 'w-3.5 h-3.5 rounded text-[#1f4e79]';
+          cb.addEventListener('change', () => {
+            if (cb.checked) state.modalTempSelected.add(val);
+            else state.modalTempSelected.delete(val);
+          });
+          const span = document.createElement('span');
+          span.className = 'truncate';
+          span.textContent = val;
+          label.appendChild(cb);
+          label.appendChild(span);
+          el.modalValuesList.appendChild(label);
+        });
+      }
+
+      function getFilteredRows(dataRows) {
+        return dataRows.filter(row => {
+          for (const f of state.filters) {
+            if (!f.column || f.values.length === 0) continue;
+            const cellStr = isNotEmpty(row[f.column]) ? String(row[f.column]) : '';
+            if (!f.values.includes(cellStr)) return false;
+          }
+          return true;
+        });
+      }
+
+      function updatePreviewAndCounts() {
+        const filtered = getFilteredRows(state.rows);
+        el.filteredRowCount.textContent = filtered.length;
+        el.totalRowCount.textContent = state.rows.length ? `/ ${state.rows.length} total` : '';
+
+        if (filtered.length === 0) {
+          el.previewWrapper.innerHTML = '<p class="text-xs text-slate-400 text-center py-8">No matching rows to display.</p>';
+          return;
+        }
+
+        const sample = filtered.slice(0, 25);
+        let html = '<table class="min-w-full text-xs text-left border-collapse">';
+        html += '<thead class="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200"><tr>';
+        state.columns.forEach(c => {
+          html += `<th class="px-3 py-2 whitespace-nowrap">${escapeXml(c)}</th>`;
+        });
+        html += '</tr></thead><tbody class="divide-y divide-slate-100">';
+        sample.forEach(r => {
+          html += '<tr class="hover:bg-slate-50">';
+          state.columns.forEach(c => {
+            const v = r[c] !== undefined && r[c] !== null ? String(r[c]) : '';
+            html += `<td class="px-3 py-1.5 whitespace-nowrap text-slate-600">${escapeXml(v)}</td>`;
+          });
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+        el.previewWrapper.innerHTML = html;
+      }
+
+      function cartesianProduct(arrays) {
+        return arrays.reduce((acc, curr) => {
+          const res = [];
+          acc.forEach(a => curr.forEach(b => res.push([...a, b])));
+          return res;
+        }, [[]]);
+      }
+
+      function getSeparateExportGroups() {
+        const sepFilters = state.filters.filter(f => f.separate && f.column && f.values.length > 0);
+        if (sepFilters.length === 0 && !el.globalSeparateChk.checked) return null;
+        if (sepFilters.length === 0) return null;
+        const combos = cartesianProduct(sepFilters.map(f => f.values));
+        const groups = [];
+        combos.forEach(combo => {
+          const subset = state.rows.filter(row => {
+            for (let i = 0; i < sepFilters.length; i++) {
+              const col = sepFilters[i].column;
+              const val = isNotEmpty(row[col]) ? String(row[col]) : '';
+              if (val !== combo[i]) return false;
+            }
+            return true;
+          });
+          if (subset.length > 0) {
+            groups.push({ name: combo.map(sanitizeFilename).join('_'), rows: subset });
+          }
+        });
+        return groups;
+      }
+
+      function buildKmlString(rows, nameCols, descCols, latCol, lonCol) {
+        const lines = [
+          '<?xml version="1.0" encoding="UTF-8"?>',
+          '<kml xmlns="http://www.opengis.net/kml/2.2">',
+          '<Document>'
+        ];
+        let count = 0;
+        rows.forEach(row => {
+          const lat = row[latCol];
+          const lon = row[lonCol];
+          if (!isNotEmpty(lat) || !isNotEmpty(lon)) return;
+          const nameStr = nameCols.filter(c => isNotEmpty(row[c])).map(c => String(row[c])).join(' - ');
+          const descStr = descCols.filter(c => isNotEmpty(row[c])).map(c => String(row[c])).join(' - ');
+          lines.push('<Placemark>');
+          lines.push(`<name>${escapeXml(nameStr)}</name>`);
+          lines.push(`<description>${escapeXml(descStr)}</description>`);
+          lines.push(`<Point><coordinates>${lon},${lat},0</coordinates></Point>`);
+          lines.push('</Placemark>');
+          count++;
+        });
+        lines.push('</Document></kml>');
+        return { kml: lines.join('\n'), count };
+      }
+
+      function saveWorkbook(wb, filename) {
+        if (window.AndroidBridge && typeof window.AndroidBridge.saveFile === 'function') {
+          const b64 = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+          window.AndroidBridge.saveFile(b64, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+          return;
+        }
+        XLSX.writeFile(wb, filename);
+      }
+
+      function downloadTextFile(content, filename, mimeType) {
+        if (window.AndroidBridge && typeof window.AndroidBridge.saveFile === 'function') {
+          const b64 = btoa(unescape(encodeURIComponent(content)));
+          window.AndroidBridge.saveFile(b64, filename, mimeType);
+          return;
+        }
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      // Event Listeners
+      el.fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+          const buffer = await file.arrayBuffer();
+          const workbook = XLSX.read(buffer, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+          loadDataset(rows, file.name);
+        } catch (err) {
+          showToast('Failed to read file: ' + err.message, 'error');
+        }
+      });
+
+      el.loadSampleBtn.addEventListener('click', () => {
+        const sample = [
+          { Site_ID: 'BIM-101', Zone: 'North', Status: 'Active', Notes: 'Tower Crane Base', Latitude: 36.7372, Longitude: 43.8933 },
+          { Site_ID: 'BIM-102', Zone: 'North', Status: 'Pending', Notes: 'Foundation Pier A', Latitude: 36.7385, Longitude: 43.8951 },
+          { Site_ID: 'BIM-201', Zone: 'South', Status: 'Active', Notes: 'Substation Pad', Latitude: 36.7341, Longitude: 43.8902 },
+          { Site_ID: 'BIM-202', Zone: 'South', Status: 'Completed', Notes: 'Access Gate 2', Latitude: 36.7329, Longitude: 43.8920 }
+        ];
+        loadDataset(sample, 'sample_bim_sites.xlsx');
+      });
+
+      el.latSelect.addEventListener('change', () => { state.latCol = el.latSelect.value; });
+      el.lonSelect.addEventListener('change', () => { state.lonCol = el.lonSelect.value; });
+
+      el.addFilterBtn.addEventListener('click', () => {
+        if (state.rows.length === 0) {
+          showToast('Load an Excel or CSV file first.', 'warning');
+          return;
+        }
+        state.filters.push({ id: state.nextFilterId++, column: '', values: [], separate: false });
+        renderFilterRows();
+      });
+
+      el.closeModalBtn.addEventListener('click', () => el.filterModal.classList.add('hidden'));
+      el.modalSearchInput.addEventListener('input', renderModalValues);
+      el.modalSelectAllBtn.addEventListener('click', () => {
+        const q = el.modalSearchInput.value.trim().toLowerCase();
+        state.modalAllValues.filter(v => v.toLowerCase().includes(q)).forEach(v => state.modalTempSelected.add(v));
+        renderModalValues();
+      });
+      el.modalClearAllBtn.addEventListener('click', () => {
+        const q = el.modalSearchInput.value.trim().toLowerCase();
+        state.modalAllValues.filter(v => v.toLowerCase().includes(q)).forEach(v => state.modalTempSelected.delete(v));
+        renderModalValues();
+      });
+      el.modalApplyBtn.addEventListener('click', () => {
+        const f = state.filters.find(item => item.id === state.activeModalFilterId);
+        if (f) f.values = Array.from(state.modalTempSelected);
+        el.filterModal.classList.add('hidden');
+        renderFilterRows();
+        updatePreviewAndCounts();
+      });
+
+      el.createKmlBtn.addEventListener('click', () => {
+        if (state.rows.length === 0) {
+          showToast('Please load a data file first.', 'warning');
+          return;
+        }
+        const nameCols = Array.from(state.nameCols);
+        const descCols = Array.from(state.descCols);
+        if (nameCols.length === 0 || descCols.length === 0) {
+          showToast('Select at least one Name and Description column.', 'warning');
+          return;
+        }
+        if (!state.latCol || !state.lonCol) {
+          showToast('Select both Latitude and Longitude columns.', 'warning');
+          return;
+        }
+
+        const groups = getSeparateExportGroups();
+        if (groups) {
+          if (groups.length === 0) {
+            showToast('No matching rows found for separate filter combinations.', 'warning');
+            return;
+          }
+          groups.forEach(g => {
+            const { kml } = buildKmlString(g.rows, nameCols, descCols, state.latCol, state.lonCol);
+            downloadTextFile(kml, `${g.name}.kml`, 'application/vnd.google-earth.kml+xml');
+          });
+          showToast(`Created ${groups.length} KML file(s) separately.`, 'success');
+        } else {
+          const filtered = getFilteredRows(state.rows);
+          const { kml, count } = buildKmlString(filtered, nameCols, descCols, state.latCol, state.lonCol);
+          if (count === 0) {
+            showToast('No valid coordinates found in matching rows.', 'warning');
+            return;
+          }
+          const base = state.fileName.replace(/\.[^.]+$/, '') || 'output';
+          downloadTextFile(kml, `${base}.kml`, 'application/vnd.google-earth.kml+xml');
+          showToast(`KML created with ${count} placemark(s).`, 'success');
+        }
+      });
+
+      el.createTrackerBtn.addEventListener('click', () => {
+        if (state.rows.length === 0) {
+          showToast('Please load a data file first.', 'warning');
+          return;
+        }
+        const groups = getSeparateExportGroups();
+        if (groups) {
+          if (groups.length === 0) {
+            showToast('No matching rows found for separate filter combinations.', 'warning');
+            return;
+          }
+          groups.forEach(g => {
+            const ws = XLSX.utils.json_to_sheet(g.rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Tracker');
+            saveWorkbook(wb, `${g.name}.xlsx`);
+          });
+          showToast(`Created ${groups.length} Tracker file(s) separately.`, 'success');
+        } else {
+          const filtered = getFilteredRows(state.rows);
+          if (filtered.length === 0) {
+            showToast('No matching rows to export.', 'warning');
+            return;
+          }
+          const ws = XLSX.utils.json_to_sheet(filtered);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, 'Tracker');
+          const base = state.fileName.replace(/\.[^.]+$/, '') || 'tracker';
+          saveWorkbook(wb, `${base}_tracker.xlsx`);
+          showToast(`Tracker exported with ${filtered.length} row(s).`, 'success');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
