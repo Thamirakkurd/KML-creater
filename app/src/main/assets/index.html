@@ -37,10 +37,7 @@
           Load Sample
         </button>
       </div>
-      <div class="flex items-center bg-slate-100 p-1 rounded-lg">
-        <button id="tabMapBtn" type="button" class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-md bg-[#1f4e79] text-white">Map View</button>
-        <button id="tabConfigBtn" type="button" class="px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-md text-slate-600">Columns &amp; Filters</button>
-      </div>
+
     </section>
 
     <div id="fileInfoText" class="text-xs text-slate-500 px-1">Supports .xlsx, .xls, and .csv — plots all coordinates onto the map.</div>
@@ -85,7 +82,7 @@
     </section>
 
     <!-- COLUMNS & FILTERS -->
-    <div id="configViewPanel" class="hidden space-y-4">
+    <div id="configViewPanel" class="space-y-4">
       <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="bg-white rounded-xl border border-slate-200 p-4">
           <div class="flex justify-between mb-2">
@@ -217,17 +214,9 @@
       const sanitize = s => String(s).replace(/[\\/:*?"<>|]/g, '_').trim() || 'export';
       const isNotEmpty = v => v !== null && v !== undefined && String(v).trim() !== '' && String(v).trim().toLowerCase() !== 'nan';
 
-      function switchTab(tab) {
-        const on = 'px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-md bg-[#1f4e79] text-white';
-        const off = 'px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-md text-slate-600';
-        el.tabMapBtn.className = tab === 'map' ? on : off;
-        el.tabConfigBtn.className = tab === 'config' ? on : off;
-        el.mapSection.classList.toggle('hidden', tab !== 'map');
-        el.configViewPanel.classList.toggle('hidden', tab !== 'config');
-        if (tab === 'map' && map) setTimeout(() => map.invalidateSize(), 80);
-      }
-      el.tabMapBtn.addEventListener('click', () => switchTab('map'));
-      el.tabConfigBtn.addEventListener('click', () => switchTab('config'));
+      function switchTab() { if (map) setTimeout(() => map.invalidateSize(), 80); }
+      
+      
 
       function loadDataset(rows, fileName) {
         if (!rows || !rows.length) return showToast('No data rows found.', 'warning');
@@ -238,8 +227,8 @@
         state.fileName = fileName;
         state.nameCols.clear(); state.descCols.clear(); state.filters = []; state.selectedIndices.clear();
 
-        state.latCol = state.columns.find(c => /lat/i.test(c)) || '';
-        state.lonCol = state.columns.find(c => /lon|lng/i.test(c)) || '';
+        state.latCol = state.columns.find(c => /(^|[_\s-])(lat|latitude)($|[_\s-])/i.test(c)) || '';
+        state.lonCol = state.columns.find(c => /(^|[_\s-])(lon|lng|longitude)($|[_\s-])/i.test(c)) || '';
         if (state.columns.length) {
           state.nameCols.add(state.columns[0]);
           state.descCols.add(state.columns[1] || state.columns[0]);
